@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blocky Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        body {
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            display: block;
+            background-color: #87CEEB;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        #menuScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+        }
+        
+        .screenContent {
+            background-color: rgba(50, 50, 50, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            border: 4px solid white;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .blockText {
+            font-family: monospace;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .gameButton {
+            background-color: #969696;
+            color: white;
+            border: 4px solid white;
+            padding: 15px 30px;
+            font-size: 24px;
+            cursor: pointer;
+            margin: 10px;
+            font-family: monospace;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        
+        .gameButton:hover {
+            background-color: #aaa;
+        }
+        
+        .gameButton:active {
+            background-color: #777;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        #mobileControls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 5;
+        }
+        
+        .controlBtn {
+            width: 100px;
+            height: 100px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 40px;
+            opacity: 0.7;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        #leftBtn, #rightBtn {
+            font-size: 50px;
+        }
+        
+        #jumpBtn {
+            font-size: 30px;
+        }
+        
+        #uiOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        #healthBar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 4px;
+            pointer-events: none;
+        }
+        
+        .heart {
+            width: 30px;
+            height: 30px;
+            background-color: red;
+        }
+        
+        #inventoryContainer {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: auto;
+            z-index: 10;
+        }
+        
+        #inventory {
+            display: flex;
+            gap: 5px;
+            background-color: rgba(150, 150, 150, 0.9);
+            padding: 5px;
+            border-radius: 5px;
+            pointer-events: auto;
+        }
+        
+        .inventorySlot {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(200, 200, 200, 0.9);
+            border-radius: 3px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        
+        .selectedSlot {
+            box-shadow: 0 0 0 3px yellow;
+            background-color: rgba(230, 230, 180, 0.9);
+        }
+        
+        .itemCount {
+            position: absolute;
+            bottom: 2px;
+            right: 5px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 1px 1px 0 black;
+            pointer-events: none;
+        }
+        
+        #craftingUI {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(50, 50, 50, 0.98);
+            padding: 20px;
+            border-radius: 10px;
+            border: 4px solid #555;
+            pointer-events: all;
+            z-index: 30;
+        }
+        
+        #craftingClose {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            background-color: rgb(200, 50, 50);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .craftingSlot {
+            width: 50px;
+            height: 50px;
+            background-color: rgb(121, 85, 58);
+            margin: 5px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        #craftingOutput {
+            width: 60px;
+            height: 60px;
+            background-color: white;
+            margin: 5px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .blockPreview {
+            width: 36px;
+            height: 36px;
+            image-rendering: pixelated;
+        }
+        
+        @media (max-width: 768px) {
+            .controlBtn {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .inventorySlot {
+                width: 50px;
+                height: 50px;
+            }
+            
+            #inventoryContainer {
+                bottom: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="uiOverlay">
+            <div id="healthBar"></div>
+        </div>
+        
+        <div id="inventoryContainer">
+            <div id="inventory"></div>
+        </div>
+        
+        <div id="mobileControls">
+            <div id="leftBtn" class="controlBtn">←</div>
+            <div id="rightBtn" class="controlBtn">→</div>
+            <div id="jumpBtn" class="controlBtn">↑</div>
+        </div>
+        
+        <div id="menuScreen">
+            <div class="screenContent">
+                <div class="blockText" style="font-size: 24px; margin-bottom: 40px;">BLOCKY GAME</div>
+                <div id="playBtn" class="gameButton">PLAY</div>
+                <div style="color: white; margin-top: 20px; font-size: 14px;">
+                    Use arrow keys or on-screen buttons to move<br>
+                    Click to break/place blocks<br>
+                    Select items from inventory to place them<br>
+                    Tap crafting table in inventory to craft
+                </div>
+            </div>
+        </div>
+        
+        <div id="gameOverScreen" class="hidden">
+            <div class="screenContent">
+                <div class="blockText" style="font-size: 28px; margin-bottom: 30px;">GAME OVER</div>
+                <div id="restartBtn" class="gameButton">RESTART</div>
+            </div>
+        </div>
+        
+        <div id="craftingUI" class="hidden">
+            <div id="craftingClose">X</div>
+            <div style="color: white; margin-bottom: 20px; text-align: center;">CRAFTING</div>
+            <div style="text-align: center;">
+                <div class="craftingSlot" id="craftInput0"></div>
+                <div class="craftingSlot" id="craftInput1"></div><br>
+                <div class="craftingSlot" id="craftInput2"></div>
+                <div class="craftingSlot" id="craftInput3"></div>
+                <div style="display: inline-block; margin: 0 20px; color: white; font-size: 30px;">→</div>
+                <div id="craftingOutput"></div>
+            </div>
+            <div style="color: white; margin-top: 20px; font-size: 12px; text-align: center;">
+                Recipes: Wood → 4 Planks | Plank → 2 Sticks
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIG =================
+        const WIDTH = 540;
+        const HEIGHT = 960;
+        const TILE = 32;
+        const FPS = 60;
+
+        // ================= COLORS =================
+        const BROWN = [121, 85, 58];
+        const GREEN = [95, 159, 53];
+        const GRAY = [150, 150, 150];
+        const WHITE = [255, 255, 255];
+        const BLACK = [0, 0, 0];
+        const BASE_SKY = [135, 206, 235];
+        const RED = [255, 0, 0];
+
+        // ================= GAME STATE =================
+        let gameState = 'MENU'; // MENU, PLAYING, GAME_OVER
+        let canvas, ctx;
+        let player = {};
+        let terrain = {};
+        let heights = {};
+        let drops = [];
+        let inventory = [];
+        let selectedSlot = null;
+        let breaking = null;
+        let breakStartTime = 0;
+        let craftingActive = false;
+        let craftingInputs = [null, null, null, null];
+        let craftingOutput = null;
+        let gameTime = 0;
+        let dayStartTime = 0;
+        const DAY_LENGTH = 1200;
+        let health = 10;
+        let gameOver = false;
+        let camera = {x: 0, y: 0};
+        let mouse = {x: 0, y: 0, down: false};
+        
+        // Damage table for fall damage
+        const damageTable = {
+            1:0,2:0,3:1,4:2,5:2.5,6:3,7:3.5,8:4,9:4.5,10:5,11:6,12:7,13:8,14:9,15:10
+        };
+        
+        // Block textures (pre-rendered as Image objects)
+        let blockTextures = {};
+        let blockTextureURLs = {};
+        
+        // ================= INITIALIZATION =================
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+            
+            // Create block textures
+            createBlockTextures();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Initialize game
+            resetGame();
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // ================= CREATE BLOCK TEXTURES =================
+        function createBlockTextures() {
+            // Helper to create a texture
+            function createTexture(color1, color2 = null) {
+                const canvas = document.createElement('canvas');
+                canvas.width = TILE;
+                canvas.height = TILE;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = `rgb(${color1[0]}, ${color1[1]}, ${color1[2]})`;
+                ctx.fillRect(0, 0, TILE, TILE);
+                
+                if (color2) {
+                    ctx.fillStyle = `rgb(${color2[0]}, ${color2[1]}, ${color2[2]})`;
+                    ctx.fillRect(0, 0, TILE, 10);
+                }
+                
+                return canvas;
+            }
+            
+            // Stick texture (special)
+            function createStickTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = TILE;
+                canvas.height = TILE;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = 'rgb(139, 69, 19)';
+                ctx.fillRect(0, 0, TILE, TILE);
+                
+                ctx.strokeStyle = 'rgb(255, 228, 181)';
+                ctx.lineWidth = 4;
+                
+                // Draw cross
+                ctx.beginPath();
+                ctx.moveTo(6, 8);
+                ctx.lineTo(26, 24);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(6, 24);
+                ctx.lineTo(26, 8);
+                ctx.stroke();
+                
+                return canvas;
+            }
+            
+            // Create all textures
+            const textures = {
+                'grass': createTexture(BROWN, GREEN),
+                'dirt': createTexture(BROWN),
+                'wood': createTexture([139, 69, 19]),
+                'leaves': createTexture([34, 139, 34]),
+                'stone': createTexture([100, 100, 100]),
+                'crafting_table': createTexture([160, 82, 45]),
+                'wooden_plank': createTexture([205, 133, 63]),
+                'stick': createStickTexture()
+            };
+            
+            // Store both canvas and data URL
+            blockTextures = textures;
+            for (const [key, textureCanvas] of Object.entries(textures)) {
+                blockTextureURLs[key] = textureCanvas.toDataURL();
+            }
+        }
+        
+        // ================= BREAK TIMES =================
+        const BREAK_TIME = {
+            'grass': 0.6, 'dirt': 0.5, 'wood': 1.4, 'leaves': 0.3, 
+            'stone': 10, 'crafting_table': 1, 'wooden_plank': 0.7, 'stick': 0.2
+        };
+        
+        // ================= SETUP EVENT LISTENERS =================
+        function setupEventListeners() {
+            // Mouse events for game interaction
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            
+            // Touch events for mobile
+            canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+            canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+            canvas.addEventListener('touchend', handleTouchEnd);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+            
+            // Mobile control buttons
+            document.getElementById('leftBtn').addEventListener('mousedown', () => setKeyState('left', true));
+            document.getElementById('leftBtn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                setKeyState('left', true);
+            });
+            document.getElementById('leftBtn').addEventListener('mouseup', () => setKeyState('left', false));
+            document.getElementById('leftBtn').addEventListener('mouseleave', () => setKeyState('left', false));
+            document.getElementById('leftBtn').addEventListener('touchend', (e) => {
+                e.preventDefault();
+                setKeyState('left', false);
+            });
+            
+            document.getElementById('rightBtn').addEventListener('mousedown', () => setKeyState('right', true));
+            document.getElementById('rightBtn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                setKeyState('right', true);
+            });
+            document.getElementById('rightBtn').addEventListener('mouseup', () => setKeyState('right', false));
+            document.getElementById('rightBtn').addEventListener('mouseleave', () => setKeyState('right', false));
+            document.getElementById('rightBtn').addEventListener('touchend', (e) => {
+                e.preventDefault();
+                setKeyState('right', false);
+            });
+            
+            document.getElementById('jumpBtn').addEventListener('mousedown', () => setKeyState('jump', true));
+            document.getElementById('jumpBtn').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                setKeyState('jump', true);
+            });
+            document.getElementById('jumpBtn').addEventListener('mouseup', () => setKeyState('jump', false));
+            document.getElementById('jumpBtn').addEventListener('touchend', (e) => {
+                e.preventDefault();
+                setKeyState('jump', false);
+            });
+            
+            // Menu buttons
+            document.getElementById('playBtn').addEventListener('click', startGame);
+            document.getElementById('restartBtn').addEventListener('click', restartGame);
+            
+            // Crafting UI
+            document.getElementById('craftingClose').addEventListener('click', closeCrafting);
+            
+            // Crafting input slots
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`craftInput${i}`).addEventListener('click', () => handleCraftInputClick(i));
+            }
+            
+            // Crafting output
+            document.getElementById('craftingOutput').addEventListener('click', takeCraftingOutput);
+            
+            // Prevent context menu on long press
+            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            // Prevent scrolling on mobile
+            document.body.addEventListener('touchmove', (e) => {
+                if (gameState === 'PLAYING') {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+        }
+        
+        // ================= KEY STATE MANAGEMENT =================
+        let keys = {
+            left: false,
+            right: false,
+            jump: false
+        };
+        
+        function setKeyState(key, state) {
+            keys[key] = state;
+        }
+        
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'ArrowUp' || e.key === ' ') {
+                keys.jump = true;
+                e.preventDefault();
+            }
+        }
+        
+        function handleKeyUp(e) {
+            if (e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'ArrowRight') keys.right = false;
+            if (e.key === 'ArrowUp' || e.key === ' ') keys.jump = false;
+        }
+        
+        // ================= MOUSE/TOUCH HANDLING =================
+        function handleMouseDown(e) {
+            e.preventDefault();
+            mouse.down = true;
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+            
+            handleGameClick(mouse.x, mouse.y);
+        }
+        
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        }
+        
+        function handleMouseUp() {
+            mouse.down = false;
+        }
+        
+        function handleTouchStart(e) {
+            e.preventDefault();
+            mouse.down = true;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            mouse.x = touch.clientX - rect.left;
+            mouse.y = touch.clientY - rect.top;
+            
+            handleGameClick(mouse.x, mouse.y);
+        }
+        
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            mouse.x = touch.clientX - rect.left;
+            mouse.y = touch.clientY - rect.top;
+        }
+        
+        function handleTouchEnd() {
+            mouse.down = false;
+        }
+        
+        function handleGameClick(x, y) {
+            if (gameState === 'MENU' || gameState === 'GAME_OVER') return;
+            
+            if (craftingActive) return; // Don't handle game clicks when crafting is open
+            
+            // Check if click is in inventory area
+            const inventoryContainer = document.getElementById('inventoryContainer');
+            const containerRect = inventoryContainer.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            const containerX = containerRect.left - canvasRect.left;
+            const containerY = containerRect.top - canvasRect.top;
+            const containerWidth = containerRect.width;
+            const containerHeight = containerRect.height;
+            
+            // Check if click is within inventory bounds
+            if (x >= containerX && x <= containerX + containerWidth &&
+                y >= containerY && y <= containerY + containerHeight) {
+                // Click is in inventory area - let inventory handle it
+                return;
+            }
+            
+            // Game world click
+            const worldX = x + camera.x;
+            const worldY = y + camera.y;
+            const blockX = Math.floor(worldX / TILE);
+            const blockY = Math.floor(worldY / TILE);
+            
+            // Check if clicking on existing block
+            const blockKey = `${blockX},${blockY}`;
+            if (terrain[blockKey]) {
+                // Start breaking the block
+                breaking = {x: blockX, y: blockY};
+                breakStartTime = Date.now() / 1000;
+            } else {
+                // Try to place a block
+                if (selectedSlot !== null && inventory[selectedSlot]) {
+                    const blockType = inventory[selectedSlot].type;
+                    
+                    // Check if adjacent to existing block
+                    const adjacent = [
+                        `${blockX+1},${blockY}`,
+                        `${blockX-1},${blockY}`,
+                        `${blockX},${blockY+1}`,
+                        `${blockX},${blockY-1}`
+                    ];
+                    
+                    let canPlace = false;
+                    for (const key of adjacent) {
+                        if (terrain[key]) {
+                            canPlace = true;
+                            break;
+                        }
+                    }
+                    
+                    // Also check if player is not inside the block
+                    const playerBlockX = Math.floor(player.x / TILE);
+                    const playerBlockY = Math.floor((player.y + player.height) / TILE);
+                    const notInsidePlayer = !(blockX === playerBlockX && blockY === playerBlockY);
+                    
+                    if (canPlace && notInsidePlayer) {
+                        terrain[blockKey] = blockType;
+                        removeFromInventory(selectedSlot, 1);
+                    }
+                }
+            }
+        }
+        
+        function handleInventoryClick(index) {
+            if (inventory[index]) {
+                // If clicking crafting table, open crafting
+                if (inventory[index].type === 'crafting_table') {
+                    openCrafting();
+                    return;
+                }
+                
+                // Toggle selection
+                if (selectedSlot === index) {
+                    selectedSlot = null;
+                } else {
+                    selectedSlot = index;
+                }
+                updateInventoryUI();
+            } else {
+                selectedSlot = null;
+                updateInventoryUI();
+            }
+        }
+        
+        // ================= PLAYER =================
+        function createPlayer() {
+            return {
+                x: WIDTH / 2,
+                y: HEIGHT / 2,
+                width: 28,
+                height: 44,
+                vx: 0,
+                vy: 0,
+                onGround: false,
+                prevY: HEIGHT / 2,
+                velocityX: 0
+            };
+        }
+        
+        function updatePlayer() {
+            // Apply horizontal movement with acceleration
+            let targetVelX = 0;
+            if (keys.left) targetVelX = -4;
+            if (keys.right) targetVelX = 4;
+            
+            // Smooth movement
+            player.velocityX += (targetVelX - player.velocityX) * 0.5;
+            player.x += player.velocityX;
+            
+            // Collision with blocks (horizontal)
+            const playerRect = {
+                x: player.x,
+                y: player.y,
+                width: player.width,
+                height: player.height
+            };
+            
+            for (const key in terrain) {
+                const [bx, by] = key.split(',').map(Number);
+                const blockRect = {
+                    x: bx * TILE,
+                    y: by * TILE,
+                    width: TILE,
+                    height: TILE
+                };
+                
+                if (rectCollision(playerRect, blockRect)) {
+                    if (player.velocityX > 0) {
+                        player.x = blockRect.x - player.width;
+                        player.velocityX = 0;
+                    } else if (player.velocityX < 0) {
+                        player.x = blockRect.x + blockRect.width;
+                        player.velocityX = 0;
+                    }
+                }
+            }
+            
+            // Apply gravity
+            player.vy += 0.8;
+            player.y += player.vy;
+            
+            // Reset ground state
+            player.onGround = false;
+            let landed = false;
+            
+            // Collision with blocks (vertical)
+            playerRect.y = player.y;
+            for (const key in terrain) {
+                const [bx, by] = key.split(',').map(Number);
+                const blockRect = {
+                    x: bx * TILE,
+                    y: by * TILE,
+                    width: TILE,
+                    height: TILE
+                };
+                
+                if (rectCollision(playerRect, blockRect)) {
+                    if (player.vy > 0) {
+                        // Landing on block
+                        player.y = blockRect.y - player.height;
+                        player.vy = 0;
+                        player.onGround = true;
+                        landed = true;
+                    } else if (player.vy < 0) {
+                        // Hitting block from below
+                        player.y = blockRect.y + blockRect.height;
+                        player.vy = 0;
+                    }
+                }
+            }
+            
+            // Jump
+            if (keys.jump && player.onGround) {
+                player.vy = -13;
+                keys.jump = false; // Reset jump key
+            }
+            
+            // Fall damage
+            if (landed) {
+                const fallDistance = Math.floor((player.prevY - player.y) / TILE);
+                const damage = damageTable[fallDistance] || 0;
+                
+                if (damage > 0) {
+                    health -= damage;
+                    if (health <= 0) {
+                        health = 0;
+                        gameOver = true;
+                        gameState = 'GAME_OVER';
+                        document.getElementById('gameOverScreen').classList.remove('hidden');
+                    }
+                    updateHealthUI();
+                }
+            }
+            
+            if (player.onGround) {
+                player.prevY = player.y;
+            }
+            
+            // Update camera
+            camera.x += (player.x - camera.x - WIDTH/2) * 0.1;
+            camera.y += (player.y - camera.y - HEIGHT/2) * 0.1;
+        }
+        
+        function drawPlayer() {
+            // Draw player (simplified representation)
+            ctx.fillStyle = 'rgb(240, 200, 170)';
+            ctx.fillRect(player.x - camera.x + 6, player.y - camera.y, 16, 14);
+            
+            ctx.fillStyle = 'rgb(30, 144, 255)';
+            ctx.fillRect(player.x - camera.x + 4, player.y - camera.y + 14, 20, 14);
+            
+            ctx.fillStyle = 'rgb(20, 20, 120)';
+            ctx.fillRect(player.x - camera.x + 6, player.y - camera.y + 28, 6, 14);
+            ctx.fillRect(player.x - camera.x + 16, player.y - camera.y + 28, 6, 14);
+        }
+        
+        // ================= TERRAIN GENERATION =================
+        function generateTerrainAt(x) {
+            // Get height from previous column or default
+            let h = heights[x-1] !== undefined ? heights[x-1] : 20;
+            h += Math.random() < 0.5 ? -1 : 1;
+            h = Math.max(15, Math.min(35, h));
+            heights[x] = h;
+            
+            // Generate column
+            for (let i = 0; i < 40; i++) {
+                const y = h + i;
+                const key = `${x},${y}`;
+                
+                if (i === 0) {
+                    terrain[key] = 'grass';
+                } else if (i >= 1 && i <= 4) {
+                    terrain[key] = 'dirt';
+                } else {
+                    terrain[key] = 'stone';
+                }
+            }
+            
+            // Occasionally generate a tree
+            if (Math.random() < 0.1) {
+                // Tree trunk
+                for (let i = 1; i < 4; i++) {
+                    terrain[`${x},${h-i}`] = 'wood';
+                }
+                
+                // Tree leaves
+                const leavesPositions = [
+                    [-1, -4], [0, -4], [1, -4], [0, -5]
+                ];
+                
+                for (const [dx, dy] of leavesPositions) {
+                    terrain[`${x+dx},${h+dy}`] = 'leaves';
+                }
+            }
+        }
+        
+        function drawTerrain() {
+            for (const key in terrain) {
+                const [x, y] = key.split(',').map(Number);
+                const blockType = terrain[key];
+                
+                const screenX = x * TILE - camera.x;
+                const screenY = y * TILE - camera.y;
+                
+                // Only draw if on screen
+                if (screenX > -TILE && screenX < WIDTH && screenY > -TILE && screenY < HEIGHT) {
+                    ctx.drawImage(blockTextures[blockType], screenX, screenY);
+                }
+            }
+            
+            // Draw breaking overlay if applicable
+            if (breaking) {
+                const currentTime = Date.now() / 1000;
+                const breakDuration = currentTime - breakStartTime;
+                const blockType = terrain[`${breaking.x},${breaking.y}`];
+                
+                if (blockType) {
+                    const breakTime = BREAK_TIME[blockType] || 1;
+                    const progress = breakDuration / breakTime;
+                    
+                    if (progress >= 1) {
+                        // Block broken
+                        drops.push({
+                            x: breaking.x * TILE + TILE/2,
+                            y: breaking.y * TILE + TILE/2,
+                            type: blockType,
+                            vy: -5
+                        });
+                        
+                        delete terrain[`${breaking.x},${breaking.y}`];
+                        breaking = null;
+                    } else {
+                        // Draw breaking overlay
+                        const screenX = breaking.x * TILE - camera.x;
+                        const screenY = breaking.y * TILE - camera.y;
+                        
+                        ctx.strokeStyle = 'white';
+                        ctx.lineWidth = 3;
+                        const segment = Math.floor(progress * 10);
+                        
+                        // Draw cracking effect
+                        for (let i = 0; i < segment; i++) {
+                            const x1 = screenX + Math.random() * TILE;
+                            const y1 = screenY + Math.random() * TILE;
+                            const x2 = x1 + (Math.random() - 0.5) * 20;
+                            const y2 = y1 + (Math.random() - 0.5) * 20;
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.stroke();
+                        }
+                    }
+                } else {
+                    breaking = null;
+                }
+            }
+        }
+        
+        // ================= DROPS =================
+        function updateDrops() {
+            for (let i = drops.length - 1; i >= 0; i--) {
+                const drop = drops[i];
+                
+                // Apply gravity
+                drop.vy += 0.5;
+                drop.y += drop.vy;
+                
+                // Collision with terrain
+                const dropRect = {
+                    x: drop.x - 8,
+                    y: drop.y - 8,
+                    width: 16,
+                    height: 16
+                };
+                
+                for (const key in terrain) {
+                    const [bx, by] = key.split(',').map(Number);
+                    const blockRect = {
+                        x: bx * TILE,
+                        y: by * TILE,
+                        width: TILE,
+                        height: TILE
+                    };
+                    
+                    if (rectCollision(dropRect, blockRect) && drop.vy > 0) {
+                        drop.y = blockRect.y - 8;
+                        drop.vy = 0;
+                    }
+                }
+                
+                // Check if player collects drop
+                const playerRect = {
+                    x: player.x,
+                    y: player.y,
+                    width: player.width,
+                    height: player.height
+                };
+                
+                if (rectCollision(dropRect, playerRect)) {
+                    if (addToInventory(drop.type, 1)) {
+                        drops.splice(i, 1);
+                    }
+                }
+            }
+        }
+        
+        function drawDrops() {
+            for (const drop of drops) {
+                const screenX = drop.x - camera.x - 8;
+                const screenY = drop.y - camera.y - 8;
+                
+                // Draw smaller version of block
+                ctx.drawImage(blockTextures[drop.type], screenX, screenY, 16, 16);
+            }
+        }
+        
+        // ================= INVENTORY =================
+        function initInventory() {
+            inventory = [
+                {type: 'crafting_table', count: 1},
+                null, null, null, null, null, null, null, null
+            ];
+            selectedSlot = 0;
+            updateInventoryUI();
+        }
+        
+        function addToInventory(itemType, count) {
+            // First try to add to existing stacks
+            for (let i = 0; i < inventory.length; i++) {
+                if (inventory[i] && inventory[i].type === itemType && inventory[i].count < 200) {
+                    const space = 200 - inventory[i].count;
+                    const toAdd = Math.min(space, count);
+                    
+                    inventory[i].count += toAdd;
+                    count -= toAdd;
+                    
+                    if (count === 0) {
+                        updateInventoryUI();
+                        return true;
+                    }
+                }
+            }
+            
+            // Then try to add to empty slots
+            for (let i = 0; i < inventory.length; i++) {
+                if (!inventory[i]) {
+                    inventory[i] = {type: itemType, count: Math.min(count, 200)};
+                    count -= Math.min(count, 200);
+                    
+                    if (count === 0) {
+                        updateInventoryUI();
+                        return true;
+                    }
+                }
+            }
+            
+            updateInventoryUI();
+            return false;
+        }
+        
+        function removeFromInventory(index, amount) {
+            if (!inventory[index]) return;
+            
+            inventory[index].count -= amount;
+            if (inventory[index].count <= 0) {
+                inventory[index] = null;
+                
+                // If this was the selected slot, deselect it
+                if (selectedSlot === index) {
+                    selectedSlot = null;
+                }
+            }
+            
+            updateInventoryUI();
+        }
+        
+        function updateInventoryUI() {
+            const inventoryEl = document.getElementById('inventory');
+            inventoryEl.innerHTML = '';
+            
+            for (let i = 0; i < 9; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'inventorySlot';
+                if (i === selectedSlot) {
+                    slot.classList.add('selectedSlot');
+                }
+                
+                if (inventory[i]) {
+                    const img = document.createElement('img');
+                    img.src = blockTextureURLs[inventory[i].type];
+                    img.className = 'blockPreview';
+                    slot.appendChild(img);
+                    
+                    if (inventory[i].count > 1) {
+                        const count = document.createElement('div');
+                        count.className = 'itemCount';
+                        count.textContent = inventory[i].count;
+                        slot.appendChild(count);
+                    }
+                }
+                
+                // Add click event
+                slot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleInventoryClick(i);
+                });
+                inventoryEl.appendChild(slot);
+            }
+        }
+        
+        // ================= CRAFTING =================
+        const recipes = {
+            'wood': {result: 'wooden_plank', count: 4},
+            'wooden_plank': {result: 'stick', count: 2}
+        };
+        
+        function openCrafting() {
+            craftingActive = true;
+            document.getElementById('craftingUI').classList.remove('hidden');
+            updateCraftingUI();
+        }
+        
+        function closeCrafting() {
+            craftingActive = false;
+            document.getElementById('craftingUI').classList.add('hidden');
+            
+            // Return items to inventory
+            for (let i = 0; i < craftingInputs.length; i++) {
+                if (craftingInputs[i]) {
+                    addToInventory(craftingInputs[i], 1);
+                    craftingInputs[i] = null;
+                }
+            }
+            craftingOutput = null;
+        }
+        
+        function handleCraftInputClick(index) {
+            if (selectedSlot !== null && inventory[selectedSlot]) {
+                craftingInputs[index] = inventory[selectedSlot].type;
+                removeFromInventory(selectedSlot, 1);
+                updateCraftingUI();
+                checkRecipes();
+            }
+        }
+        
+        function checkRecipes() {
+            // For simplicity, just check single-item recipes
+            for (const item of craftingInputs) {
+                if (item && recipes[item]) {
+                    craftingOutput = {
+                        type: recipes[item].result,
+                        count: recipes[item].count
+                    };
+                    updateCraftingUI();
+                    return;
+                }
+            }
+            
+            craftingOutput = null;
+            updateCraftingUI();
+        }
+        
+        function takeCraftingOutput() {
+            if (craftingOutput && addToInventory(craftingOutput.type, craftingOutput.count)) {
+                // Clear inputs
+                for (let i = 0; i < craftingInputs.length; i++) {
+                    craftingInputs[i] = null;
+                }
+                craftingOutput = null;
+                updateCraftingUI();
+            }
+        }
+        
+        function updateCraftingUI() {
+            // Update input slots
+            for (let i = 0; i < 4; i++) {
+                const slot = document.getElementById(`craftInput${i}`);
+                slot.innerHTML = '';
+                
+                if (craftingInputs[i]) {
+                    const img = document.createElement('img');
+                    img.src = blockTextureURLs[craftingInputs[i]];
+                    img.className = 'blockPreview';
+                    slot.appendChild(img);
+                }
+            }
+            
+            // Update output slot
+            const outputSlot = document.getElementById('craftingOutput');
+            outputSlot.innerHTML = '';
+            
+            if (craftingOutput) {
+                const img = document.createElement('img');
+                img.src = blockTextureURLs[craftingOutput.type];
+                img.className = 'blockPreview';
+                outputSlot.appendChild(img);
+                
+                if (craftingOutput.count > 1) {
+                    const count = document.createElement('div');
+                    count.className = 'itemCount';
+                    count.textContent = craftingOutput.count;
+                    outputSlot.appendChild(count);
+                }
+            }
+        }
+        
+        // ================= HEALTH UI =================
+        function updateHealthUI() {
+            const healthBar = document.getElementById('healthBar');
+            healthBar.innerHTML = '';
+            
+            const fullHearts = Math.floor(health);
+            const hasPartial = health % 1 > 0;
+            
+            for (let i = 0; i < 10; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'heart';
+                
+                if (i < fullHearts) {
+                    heart.style.backgroundColor = 'red';
+                    heart.style.width = '30px';
+                } else if (i === fullHearts && hasPartial) {
+                    heart.style.backgroundColor = 'red';
+                    heart.style.width = '15px';
+                } else {
+                    heart.style.backgroundColor = 'gray';
+                    heart.style.width = '30px';
+                }
+                
+                healthBar.appendChild(heart);
+            }
+        }
+        
+        // ================= SKY & TIME =================
+        function drawSky() {
+            // Calculate time of day
+            const timeInDay = (Date.now() / 1000 - dayStartTime) % DAY_LENGTH;
+            const brightness = timeInDay < 600 ? 0.75 : 0.2;
+            
+            // Interpolate sky color
+            const r = Math.floor(BASE_SKY[0] * brightness);
+            const g = Math.floor(BASE_SKY[1] * brightness);
+            const b = Math.floor(BASE_SKY[2] * brightness);
+            
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        }
+        
+        // ================= GAME STATE MANAGEMENT =================
+        function startGame() {
+            gameState = 'PLAYING';
+            document.getElementById('menuScreen').classList.add('hidden');
+            dayStartTime = Date.now() / 1000;
+            updateInventoryUI();
+        }
+        
+        function restartGame() {
+            resetGame();
+            gameState = 'PLAYING';
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            dayStartTime = Date.now() / 1000;
+            updateInventoryUI();
+        }
+        
+        function resetGame() {
+            // Reset game state
+            player = createPlayer();
+            terrain = {};
+            heights = {};
+            drops = [];
+            craftingInputs = [null, null, null, null];
+            craftingOutput = null;
+            breaking = null;
+            health = 10;
+            gameOver = false;
+            camera = {x: 0, y: 0};
+            
+            // Initialize inventory
+            initInventory();
+            updateHealthUI();
+            
+            // Generate initial terrain
+            const startX = Math.floor(player.x / TILE);
+            for (let x = startX - 10; x < startX + 10; x++) {
+                generateTerrainAt(x);
+            }
+        }
+        
+        // ================= UTILITY FUNCTIONS =================
+        function rectCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+        
+        // ================= GAME LOOP =================
+        let lastTime = 0;
+        
+        function gameLoop(timestamp) {
+            // Calculate delta time
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            // Only update at ~60 FPS
+            if (deltaTime > 1000/60) {
+                updateGame(deltaTime);
+                drawGame();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function updateGame(deltaTime) {
+            if (gameState !== 'PLAYING') return;
+            
+            // Update game time
+            gameTime += deltaTime / 1000;
+            
+            // Generate terrain around player
+            const playerTileX = Math.floor(player.x / TILE);
+            for (let x = playerTileX - 15; x < playerTileX + 15; x++) {
+                if (heights[x] === undefined) {
+                    generateTerrainAt(x);
+                }
+            }
+            
+            // Update player
+            updatePlayer();
+            
+            // Update drops
+            updateDrops();
+            
+            // Handle continuous breaking
+            if (mouse.down && breaking) {
+                const currentTime = Date.now() / 1000;
+                const breakDuration = currentTime - breakStartTime;
+                const blockType = terrain[`${breaking.x},${breaking.y}`];
+                
+                if (blockType) {
+                    const breakTime = BREAK_TIME[blockType] || 1;
+                    if (breakDuration >= breakTime) {
+                        // Block broken
+                        drops.push({
+                            x: breaking.x * TILE + TILE/2,
+                            y: breaking.y * TILE + TILE/2,
+                            type: blockType,
+                            vy: -5
+                        });
+                        
+                        delete terrain[`${breaking.x},${breaking.y}`];
+                        breaking = null;
+                    }
+                } else {
+                    breaking = null;
+                }
+            }
+        }
+        
+        function drawGame() {
+            // Clear canvas
+            ctx.clearRect(0, 0, WIDTH, HEIGHT);
+            
+            if (gameState === 'PLAYING') {
+                // Draw sky
+                drawSky();
+                
+                // Draw terrain
+                drawTerrain();
+                
+                // Draw drops
+                drawDrops();
+                
+                // Draw player
+                drawPlayer();
+                
+                // Draw block placement preview
+                if (selectedSlot !== null && inventory[selectedSlot] && !craftingActive) {
+                    const worldX = mouse.x + camera.x;
+                    const worldY = mouse.y + camera.y;
+                    const blockX = Math.floor(worldX / TILE);
+                    const blockY = Math.floor(worldY / TILE);
+                    
+                    const blockKey = `${blockX},${blockY}`;
+                    if (!terrain[blockKey]) {
+                        // Check if adjacent to existing block
+                        const adjacent = [
+                            `${blockX+1},${blockY}`,
+                            `${blockX-1},${blockY}`,
+                            `${blockX},${blockY+1}`,
+                            `${blockX},${blockY-1}`
+                        ];
+                        
+                        let canPlace = false;
+                        for (const key of adjacent) {
+                            if (terrain[key]) {
+                                canPlace = true;
+                                break;
+                            }
+                        }
+                        
+                        if (canPlace) {
+                            // Draw semi-transparent preview
+                            ctx.globalAlpha = 0.6;
+                            ctx.drawImage(
+                                blockTextures[inventory[selectedSlot].type],
+                                blockX * TILE - camera.x,
+                                blockY * TILE - camera.y
+                            );
+                            ctx.globalAlpha = 1.0;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ================= START GAME =================
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
