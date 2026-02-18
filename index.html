@@ -15,6 +15,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>2D Blocky v1.4</title>
+    
+    <!-- Google AdSense -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6610010715753217"
+         crossorigin="anonymous"></script>
+    
     <style>
         * {
             margin: 0;
@@ -43,6 +48,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
         }
         
         canvas {
@@ -50,6 +56,94 @@
             background-color: #87CEEB;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            width: 540px;
+            height: 960px;
+        }
+        
+        /* ================= AD CONTAINERS ================= */
+        #adTop {
+            width: 100%;
+            max-width: 728px;
+            height: 90px;
+            background-color: #222;
+            margin: 5px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        #adBottom {
+            width: 100%;
+            max-width: 728px;
+            height: 90px;
+            background-color: #222;
+            margin: 5px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        #adSide {
+            position: fixed;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 160px;
+            height: 600px;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+            border-radius: 5px;
+            overflow: hidden;
+            z-index: 100;
+        }
+        
+        #adMobile {
+            display: none;
+            width: 100%;
+            height: 50px;
+            background-color: #222;
+            margin: 2px auto;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 12px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        /* Responsive ad layouts */
+        @media (max-width: 1200px) {
+            #adSide {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #adTop, #adBottom {
+                height: 60px;
+            }
+            
+            #adMobile {
+                display: flex;
+            }
+            
+            canvas {
+                width: 100%;
+                height: auto;
+                max-width: 540px;
+            }
         }
         
         /* ================= MAIN MENU ================= */
@@ -444,6 +538,14 @@
             display: none !important;
         }
         
+        /* Ad loading indicator */
+        .ad-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
         @media (max-width: 768px) {
             .controlBtn {
                 width: 80px;
@@ -483,7 +585,32 @@
 </head>
 <body>
     <div id="gameContainer">
+        <!-- Top Banner Ad -->
+        <div id="adTop">
+            <div class="ad-label">Advertisement</div>
+            <!-- AdSense code will be inserted here by JavaScript -->
+        </div>
+        
+        <!-- Main Game Canvas -->
         <canvas id="gameCanvas"></canvas>
+        
+        <!-- Bottom Banner Ad -->
+        <div id="adBottom">
+            <div class="ad-label">Advertisement</div>
+            <!-- AdSense code will be inserted here by JavaScript -->
+        </div>
+        
+        <!-- Sidebar Ad (Desktop only) -->
+        <div id="adSide">
+            <div class="ad-label">Advertisement</div>
+            <!-- AdSense code will be inserted here by JavaScript -->
+        </div>
+        
+        <!-- Mobile Sticky Ad -->
+        <div id="adMobile">
+            <div class="ad-label">Advertisement</div>
+            <!-- AdSense code will be inserted here by JavaScript -->
+        </div>
         
         <!-- Main Menu -->
         <div id="menuScreen">
@@ -556,6 +683,83 @@
     </div>
 
     <script>
+        // ================= ADSENSE INITIALIZATION =================
+        function initializeAds() {
+            try {
+                // Push ads to all containers
+                const adContainers = ['adTop', 'adBottom', 'adSide', 'adMobile'];
+                
+                adContainers.forEach(containerId => {
+                    const container = document.getElementById(containerId);
+                    if (container) {
+                        // Clear the container
+                        container.innerHTML = '';
+                        
+                        // Create ad ins element
+                        const ins = document.createElement('ins');
+                        ins.className = 'adsbygoogle';
+                        ins.style.display = 'block';
+                        
+                        // Set different sizes for different containers
+                        switch(containerId) {
+                            case 'adTop':
+                            case 'adBottom':
+                                ins.style.width = '728px';
+                                ins.style.height = '90px';
+                                break;
+                            case 'adSide':
+                                ins.style.width = '160px';
+                                ins.style.height = '600px';
+                                break;
+                            case 'adMobile':
+                                ins.style.width = '320px';
+                                ins.style.height = '50px';
+                                break;
+                        }
+                        
+                        ins.setAttribute('data-ad-client', 'ca-pub-6610010715753217');
+                        ins.setAttribute('data-ad-slot', 'YOUR_AD_SLOT'); // You need to replace this with your actual ad slot IDs
+                        ins.setAttribute('data-ad-format', 'auto');
+                        ins.setAttribute('data-full-width-responsive', 'true');
+                        
+                        container.appendChild(ins);
+                        
+                        // Push the ad
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    }
+                });
+                
+                console.log('Ads initialized successfully');
+            } catch (error) {
+                console.log('Ad initialization error:', error);
+            }
+        }
+        
+        // Show/hide ads based on game state
+        function showAds() {
+            document.getElementById('adTop').style.display = 'flex';
+            document.getElementById('adBottom').style.display = 'flex';
+            document.getElementById('adSide').style.display = 'flex';
+            document.getElementById('adMobile').style.display = 'flex';
+        }
+        
+        function hideAds() {
+            document.getElementById('adTop').style.display = 'none';
+            document.getElementById('adBottom').style.display = 'none';
+            document.getElementById('adSide').style.display = 'none';
+            document.getElementById('adMobile').style.display = 'none';
+        }
+        
+        // Show ads when in menu
+        function showMenuAds() {
+            showAds();
+        }
+        
+        // Hide ads during gameplay
+        function hideGameplayAds() {
+            hideAds();
+        }
+        
         // ================= CONFIG =================
         const WIDTH = 540;
         const HEIGHT = 960;
@@ -745,6 +949,9 @@
             document.getElementById('craftingUI').classList.add('hidden');
             craftingActive = false;
             updateWorldList();
+            
+            // Show ads when in menu
+            showMenuAds();
         }
         
         // Load world by ID
@@ -933,6 +1140,11 @@
             createCraftingGrid();
             loadWorlds();
             resetGame();
+            
+            // Initialize ads
+            setTimeout(() => {
+                initializeAds();
+            }, 1000);
             
             requestAnimationFrame(gameLoop);
         }
@@ -2202,6 +2414,9 @@
             document.getElementById('mobileControls').classList.remove('hidden');
             dayStartTime = Date.now() / 1000;
             updateInventoryUI();
+            
+            // Hide ads during gameplay
+            hideGameplayAds();
         }
         
         function resetGame() {
