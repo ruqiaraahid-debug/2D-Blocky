@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>Untitled</title>
+    <title>2D Blocky Game v1.6</title>
     
 
   </head>
@@ -14,7 +14,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Blocky v1.5</title>
+    <title>Blocky v1.6</title>
     <style>
         * {
             margin: 0;
@@ -503,11 +503,11 @@
         <!-- Main Menu -->
         <div id="menuScreen">
             <div id="menuContent">
-                <div id="menuTitle">2D Blocky v1.5</div>
+                <div id="menuTitle">Blocky v1.6</div>
                 <div id="newWorldBtn" class="menuButton">NEW WORLD</div>
                 <div id="worldList"></div>
             </div>
-            <div class="versionBadge">v1.5 - Mobs, Caves & Day/Night</div>
+            <div class="versionBadge">v1.6 - Food, Animals & Dynamic Spawn</div>
         </div>
         
         <!-- Game Overlay -->
@@ -594,12 +594,20 @@
         const DIAMOND_CYAN = [0, 255, 255];
         const STONE_GRAY = [120, 120, 120];
         
-        // Mob colors
+        // Animal colors
         const ZOMBIE_GREEN = [40, 80, 40];
-        const ZOMBIE_EYES = [255, 0, 0];
         const SPIDER_RED = [150, 0, 0];
-        const SPIDER_EYES = [255, 255, 0];
         const SHEEP_WHITE = [240, 240, 240];
+        const COW_BROWN = [139, 69, 19];
+        const COW_SPOTS = [101, 67, 33];
+        const CHICKEN_YELLOW = [255, 255, 0];
+        const BIRD_BLUE = [135, 206, 235];
+        
+        // Food colors
+        const RAW_BEEF = [180, 80, 80];
+        const RAW_MUTTON = [200, 100, 80];
+        const RAW_CHICKEN = [240, 200, 160];
+        const FEATHER = [240, 240, 240];
         
         // Flower colors
         const ROSE_RED = [255, 0, 0];
@@ -641,6 +649,10 @@
         let camera = {x: 0, y: 0};
         let mouse = {x: 0, y: 0, down: false};
         let attackCooldown = 0;
+        
+        // Spawn timer (per second)
+        let spawnTimer = 0;
+        const SPAWN_INTERVAL = 1000; // 1 second
         
         // World management
         let worlds = [];
@@ -919,9 +931,9 @@
             const seconds = Math.floor(timeInCycle % 60);
             let phase = '';
             
-            if (timeInCycle < 300) phase = 'DAY';
-            else if (timeInCycle < 600) phase = 'SUNSET';
-            else phase = 'NIGHT';
+            if (timeInCycle < 300) phase = '☀️ DAY';
+            else if (timeInCycle < 600) phase = '🌅 SUNSET';
+            else phase = '🌙 NIGHT';
             
             document.getElementById('timeDisplay').textContent = `${phase} ${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
@@ -952,7 +964,7 @@
                         const caveY = currentY + dy;
                         const key = `${caveX},${caveY}`;
                         
-                        if (terrain[key] === 'stone' || terrain[key]?.includes('_ore')) {
+                        if (terrain[key] === 'stone' || (terrain[key] && terrain[key].includes('_ore'))) {
                             terrain[key] = 'air';
                         }
                     }
@@ -974,7 +986,7 @@
                 this.vy = 0;
                 this.onGround = false;
                 this.health = this.getMaxHealth();
-                this.speed = 2; // blocks per second
+                this.speed = this.getSpeed();
                 this.chaseRange = 15;
                 this.attackRange = 3;
                 this.attackDamage = this.getAttackDamage();
@@ -985,23 +997,48 @@
                 this.targetX = 0;
                 this.targetY = 0;
                 this.wanderTimer = 0;
+                this.fleeTimer = 0;
+                this.spawnY = y; // for bird flight limit
+                this.animationFrame = 0;
+                this.animationTimer = 0;
             }
             
             getMaxHealth() {
-                switch(this.type) {
-                    case 'zombie': return 4;
-                    case 'spider': return 2.5;
-                    case 'sheep': return 3;
-                    default: return 1;
-                }
+                const stats = {
+                    'zombie': 4, 'spider': 2.5, 'sheep': 3,
+                    'cow': 4, 'chicken': 1.5, 'bird': 1
+                };
+                return stats[this.type] || 1;
+            }
+            
+            getSpeed() {
+                const stats = {
+                    'zombie': 2, 'spider': 2, 'sheep': 2,
+                    'cow': 2.5, 'chicken': 2, 'bird': 4
+                };
+                return stats[this.type] || 2;
             }
             
             getAttackDamage() {
-                switch(this.type) {
-                    case 'zombie': return 1;
-                    case 'spider': return 0.5;
-                    default: return 0;
-                }
+                const stats = {
+                    'zombie': 1, 'spider': 0.5,
+                    'sheep': 0, 'cow': 0, 'chicken': 0, 'bird': 0
+                };
+                return stats[this.type] || 0;
+            }
+            
+            getDrops() {
+                const drops = {
+                    'sheep': [{type: 'raw_mutton', count: 1 + Math.floor(Math.random() * 2)}],
+                    'cow': [{type: 'raw_beef', count: 1 + Math.floor(Math.random() * 2)}],
+                    'chicken': [
+                        {type: 'raw_chicken', count: 1},
+                        {type: 'feather', count: 1 + Math.floor(Math.random() * 3)}
+                    ],
+                    'bird': [{type: 'feather', count: 1 + Math.floor(Math.random() * 2)}],
+                    'zombie': [], 'spider': []
+                };
+                return drops[this.type] || [];
             }
             
             takeDamage(amount) {
@@ -1025,11 +1062,25 @@
             update(dt, player, terrain) {
                 const seconds = dt / 1000;
                 
+                // Animation
+                this.animationTimer += dt;
+                if (this.animationTimer > 200) {
+                    this.animationFrame = (this.animationFrame + 1) % 4;
+                    this.animationTimer = 0;
+                }
+                
                 // Sunlight damage for hostiles during day
                 if (isDay() && (this.type === 'zombie' || this.type === 'spider')) {
                     const blockAbove = terrain[`${Math.floor(this.x / TILE)},${Math.floor(this.y / TILE) - 1}`];
                     if (!blockAbove || blockAbove === 'air') {
                         return true; // Instant death in sunlight
+                    }
+                }
+                
+                // Bird flight limitation
+                if (this.type === 'bird') {
+                    if (Math.abs(this.y - this.spawnY) > 15 * TILE) {
+                        this.vy = (this.spawnY > this.y ? 1 : -1) * this.speed * TILE * seconds;
                     }
                 }
                 
@@ -1048,23 +1099,36 @@
                     this.despawnTimer = 0;
                 }
                 
+                // Update flee timer
+                if (this.fleeTimer > 0) {
+                    this.fleeTimer -= dt;
+                }
+                
                 // AI behavior
-                if (this.type === 'sheep') {
-                    // Sheep behavior - runs away when attacked
-                    if (this.state === 'fleeing') {
+                if (this.type === 'sheep' || this.type === 'cow' || this.type === 'chicken' || this.type === 'bird') {
+                    // Passive animals
+                    if (this.fleeTimer > 0) {
+                        // Fleeing behavior
+                        this.state = 'fleeing';
                         const angle = Math.atan2(this.y - player.y, this.x - player.x);
                         this.vx = Math.cos(angle) * 3 * TILE * seconds;
                         this.vy = Math.sin(angle) * 3 * TILE * seconds;
                         
-                        if (distanceToPlayer > 20 * TILE) {
+                        if (this.fleeTimer <= 0) {
                             this.state = 'idle';
                         }
                     } else {
+                        this.state = 'idle';
                         // Random wandering
                         this.wanderTimer -= dt;
                         if (this.wanderTimer <= 0) {
-                            this.targetX = this.x + (Math.random() - 0.5) * 10 * TILE;
-                            this.targetY = this.y + (Math.random() - 0.5) * 5 * TILE;
+                            if (this.type === 'bird') {
+                                this.targetX = this.x + (Math.random() - 0.5) * 10 * TILE;
+                                this.targetY = this.spawnY + (Math.random() - 0.5) * 10 * TILE;
+                            } else {
+                                this.targetX = this.x + (Math.random() - 0.5) * 8 * TILE;
+                                this.targetY = this.y + (Math.random() - 0.5) * 3 * TILE;
+                            }
                             this.wanderTimer = 3000 + Math.random() * 5000;
                         }
                         
@@ -1081,6 +1145,12 @@
                             this.vy = 0;
                         }
                     }
+                    
+                    // Chicken small jump/flight ability
+                    if (this.type === 'chicken' && this.onGround && Math.random() < 0.01) {
+                        this.vy = -8;
+                    }
+                    
                 } else {
                     // Hostile mobs (zombie, spider)
                     if (distanceToPlayer <= this.chaseRange * TILE) {
@@ -1187,65 +1257,115 @@
                 const screenX = this.x - camera.x;
                 const screenY = this.y - camera.y;
                 
-                // Body
+                // Don't draw if off screen
+                if (screenX < -TILE || screenX > WIDTH + TILE || screenY < -TILE || screenY > HEIGHT + TILE) {
+                    return;
+                }
+                
+                // Animation states
+                const isMoving = Math.abs(this.vx) > 0.1;
+                const isFleeing = this.state === 'fleeing';
+                const walkOffset = (isMoving || isFleeing) ? Math.sin(this.animationFrame * 0.5) * 2 : 0;
+                
                 if (this.type === 'zombie') {
                     ctx.fillStyle = 'rgb(40, 80, 40)';
-                    ctx.fillRect(screenX + 6, screenY, 16, 14);
+                    ctx.fillRect(screenX + 6, screenY + walkOffset, 16, 14);
                     
-                    // Head
                     ctx.fillStyle = 'rgb(60, 100, 60)';
-                    ctx.fillRect(screenX + 8, screenY - 10, 12, 12);
+                    ctx.fillRect(screenX + 8, screenY - 10 + walkOffset, 12, 12);
                     
-                    // Eyes
                     ctx.fillStyle = 'rgb(255, 0, 0)';
-                    ctx.fillRect(screenX + 10, screenY - 6, 3, 3);
-                    ctx.fillRect(screenX + 15, screenY - 6, 3, 3);
+                    ctx.fillRect(screenX + 10, screenY - 6 + walkOffset, 3, 3);
+                    ctx.fillRect(screenX + 15, screenY - 6 + walkOffset, 3, 3);
                     
                 } else if (this.type === 'spider') {
                     ctx.fillStyle = 'rgb(150, 0, 0)';
-                    ctx.fillRect(screenX + 6, screenY, 16, 14);
+                    ctx.fillRect(screenX + 6, screenY + walkOffset, 16, 14);
                     
-                    // Head
                     ctx.fillStyle = 'rgb(180, 0, 0)';
-                    ctx.fillRect(screenX + 8, screenY - 10, 12, 12);
+                    ctx.fillRect(screenX + 8, screenY - 10 + walkOffset, 12, 12);
                     
-                    // Eyes
                     ctx.fillStyle = 'rgb(255, 255, 0)';
-                    ctx.fillRect(screenX + 10, screenY - 6, 3, 3);
-                    ctx.fillRect(screenX + 15, screenY - 6, 3, 3);
+                    ctx.fillRect(screenX + 10, screenY - 6 + walkOffset, 3, 3);
+                    ctx.fillRect(screenX + 15, screenY - 6 + walkOffset, 3, 3);
                     
-                    // Legs
                     ctx.strokeStyle = 'rgb(100, 0, 0)';
                     ctx.lineWidth = 3;
                     
                     ctx.beginPath();
-                    ctx.moveTo(screenX + 6, screenY + 7);
-                    ctx.lineTo(screenX, screenY + 14);
+                    ctx.moveTo(screenX + 6, screenY + 7 + walkOffset);
+                    ctx.lineTo(screenX, screenY + 14 + walkOffset);
                     ctx.stroke();
                     
                     ctx.beginPath();
-                    ctx.moveTo(screenX + 22, screenY + 7);
-                    ctx.lineTo(screenX + 28, screenY + 14);
+                    ctx.moveTo(screenX + 22, screenY + 7 + walkOffset);
+                    ctx.lineTo(screenX + 28, screenY + 14 + walkOffset);
                     ctx.stroke();
                     
                 } else if (this.type === 'sheep') {
                     ctx.fillStyle = 'rgb(240, 240, 240)';
-                    ctx.fillRect(screenX + 6, screenY, 16, 14);
+                    ctx.fillRect(screenX + 6, screenY + walkOffset, 16, 14);
                     
-                    // Head
                     ctx.fillStyle = 'rgb(255, 255, 255)';
-                    ctx.fillRect(screenX + 8, screenY - 10, 12, 12);
+                    ctx.fillRect(screenX + 8, screenY - 10 + walkOffset, 12, 12);
                     
-                    // Eyes
                     ctx.fillStyle = 'black';
-                    ctx.fillRect(screenX + 10, screenY - 6, 2, 2);
-                    ctx.fillRect(screenX + 15, screenY - 6, 2, 2);
+                    ctx.fillRect(screenX + 10, screenY - 6 + walkOffset, 2, 2);
+                    ctx.fillRect(screenX + 15, screenY - 6 + walkOffset, 2, 2);
                     
-                    // Wool texture
-                    ctx.fillStyle = 'rgb(220, 220, 220)';
                     for (let i = 0; i < 4; i++) {
-                        ctx.fillRect(screenX + 8 + i * 4, screenY + 2, 2, 2);
+                        ctx.fillStyle = 'rgb(220, 220, 220)';
+                        ctx.fillRect(screenX + 8 + i * 4, screenY + 2 + walkOffset, 2, 2);
                     }
+                    
+                } else if (this.type === 'cow') {
+                    ctx.fillStyle = 'rgb(139, 69, 19)';
+                    ctx.fillRect(screenX + 6, screenY + walkOffset, 16, 14);
+                    
+                    ctx.fillStyle = 'rgb(101, 67, 33)';
+                    ctx.fillRect(screenX + 8, screenY - 10 + walkOffset, 12, 12);
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(screenX + 10, screenY - 6 + walkOffset, 2, 2);
+                    ctx.fillRect(screenX + 15, screenY - 6 + walkOffset, 2, 2);
+                    
+                    for (let i = 0; i < 3; i++) {
+                        ctx.fillStyle = 'rgb(101, 67, 33)';
+                        ctx.fillRect(screenX + 10 + i * 4, screenY + 4 + walkOffset, 2, 2);
+                    }
+                    
+                } else if (this.type === 'chicken') {
+                    ctx.fillStyle = 'rgb(255, 255, 0)';
+                    ctx.fillRect(screenX + 6, screenY + walkOffset, 16, 14);
+                    
+                    ctx.fillStyle = 'rgb(255, 200, 0)';
+                    ctx.fillRect(screenX + 8, screenY - 10 + walkOffset, 12, 12);
+                    
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(screenX + 10, screenY - 6 + walkOffset, 2, 2);
+                    ctx.fillRect(screenX + 15, screenY - 6 + walkOffset, 2, 2);
+                    
+                    ctx.fillStyle = 'rgb(255, 150, 0)';
+                    ctx.fillRect(screenX + 4, screenY + 2 + walkOffset, 3, 5);
+                    
+                } else if (this.type === 'bird') {
+                    const flyOffset = this.animationFrame % 2 ? 0 : 2;
+                    ctx.fillStyle = 'rgb(135, 206, 235)';
+                    ctx.fillRect(screenX + 6, screenY + flyOffset, 16, 12);
+                    
+                    ctx.fillStyle = 'rgb(100, 150, 200)';
+                    ctx.fillRect(screenX + 8, screenY - 6, 12, 8);
+                    
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(screenX + 10, screenY - 2, 2, 2);
+                    ctx.fillRect(screenX + 15, screenY - 2, 2, 2);
+                    
+                    ctx.fillStyle = 'rgb(255, 255, 255)';
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + 20, screenY - 2);
+                    ctx.lineTo(screenX + 26, screenY - 6);
+                    ctx.lineTo(screenX + 26, screenY + 2);
+                    ctx.fill();
                 }
                 
                 // Health bar
@@ -1255,50 +1375,76 @@
             }
         }
         
-        // ================= MOB SPAWNING =================
+        // ================= MOB SPAWNING (Per Block Per Second) =================
         function spawnMobs() {
             const timeInCycle = getTimeOfDay();
             
-            // Night spawn - hostiles
-            if (timeInCycle >= 600) {
-                // Zombie: 1.5% chance per block
-                if (Math.random() < 0.015) {
-                    const spawnX = Math.floor(player.x / TILE) + Math.floor(Math.random() * 40) - 20;
-                    const surfaceY = findSurfaceY(spawnX);
-                    if (surfaceY) {
-                        mobs.push(new Mob('zombie', spawnX * TILE + TILE/2, (surfaceY - 1) * TILE));
-                    }
-                }
-                
-                // Spider: 3% chance per block
-                if (Math.random() < 0.03) {
-                    const spawnX = Math.floor(player.x / TILE) + Math.floor(Math.random() * 40) - 20;
-                    const surfaceY = findSurfaceY(spawnX);
-                    if (surfaceY) {
-                        mobs.push(new Mob('spider', spawnX * TILE + TILE/2, (surfaceY - 1) * TILE));
+            // Count valid surface blocks around player (within 15 blocks horizontally)
+            let validBlocks = 0;
+            const playerTileX = Math.floor(player.x / TILE);
+            
+            for (let x = playerTileX - 15; x <= playerTileX + 15; x++) {
+                for (let y = 0; y < 100; y++) {
+                    if (terrain[`${x},${y}`] && terrain[`${x},${y}`] !== 'air' && 
+                        (!terrain[`${x},${y-1}`] || terrain[`${x},${y-1}`] === 'air')) {
+                        validBlocks++;
                     }
                 }
             }
             
-            // Day spawn - sheep (4% chance)
+            if (validBlocks === 0) return;
+            
+            // Day spawn - passive animals
             if (timeInCycle < 300) {
-                if (Math.random() < 0.04) {
-                    const spawnX = Math.floor(player.x / TILE) + Math.floor(Math.random() * 40) - 20;
-                    const surfaceY = findSurfaceY(spawnX);
-                    if (surfaceY) {
-                        mobs.push(new Mob('sheep', spawnX * TILE + TILE/2, (surfaceY - 1) * TILE));
-                    }
+                // Sheep: 0.02% per block per second
+                if (Math.random() < 0.0002 * validBlocks) {
+                    trySpawnMob('sheep');
+                }
+                // Cow: 0.01% per block per second
+                if (Math.random() < 0.0001 * validBlocks) {
+                    trySpawnMob('cow');
+                }
+                // Chicken: 0.03% per block per second
+                if (Math.random() < 0.0003 * validBlocks) {
+                    trySpawnMob('chicken');
+                }
+                // Bird: 0.04% per block per second
+                if (Math.random() < 0.0004 * validBlocks) {
+                    trySpawnMob('bird');
+                }
+            }
+            
+            // Night spawn - hostiles
+            if (timeInCycle >= 600) {
+                // Zombie: 0.006% per block per second
+                if (Math.random() < 0.00006 * validBlocks) {
+                    trySpawnMob('zombie');
+                }
+                // Spider: 0.01% per block per second
+                if (Math.random() < 0.0001 * validBlocks) {
+                    trySpawnMob('spider');
                 }
             }
         }
         
-        function findSurfaceY(x) {
+        function trySpawnMob(type) {
+            const spawnX = Math.floor(player.x / TILE) + Math.floor(Math.random() * 30) - 15;
+            
+            // Find surface block
             for (let y = 0; y < 100; y++) {
-                if (terrain[`${x},${y}`] && terrain[`${x},${y}`] !== 'air') {
-                    return y;
+                const key = `${spawnX},${y}`;
+                if (terrain[key] && terrain[key] !== 'air') {
+                    // Found ground - spawn above it
+                    if (type === 'bird') {
+                        // Birds spawn in air
+                        const spawnY = y - 5 - Math.floor(Math.random() * 10);
+                        mobs.push(new Mob(type, spawnX * TILE + TILE/2, spawnY * TILE));
+                    } else {
+                        mobs.push(new Mob(type, spawnX * TILE + TILE/2, (y - 1) * TILE));
+                    }
+                    return;
                 }
             }
-            return null;
         }
         
         // ================= BLOCK TEXTURES =================
@@ -1340,7 +1486,8 @@
                 'crafting_table': 1, 'wooden_plank': 0.7, 'stick': 0.2,
                 'tall_grass': 1, 'short_grass': 1, 'rose': 1, 'orange_tulip': 1,
                 'blue_tulip': 1, 'lily': 1,
-                'coal': 0.5, 'iron': 0.8, 'gold': 1, 'diamond': 1.5
+                'coal': 0.5, 'iron': 0.8, 'gold': 1, 'diamond': 1.5,
+                'raw_beef': 0.2, 'raw_mutton': 0.2, 'raw_chicken': 0.2, 'feather': 0.1
             };
             
             return baseBreakTimes[blockType] || 1;
@@ -1469,6 +1616,44 @@
                 
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
                 ctx.fillRect(10, 10, 5, 5);
+                
+                return canvas;
+            }
+            
+            // Create food texture
+            function createFoodTexture(color, type) {
+                const canvas = document.createElement('canvas');
+                canvas.width = TILE;
+                canvas.height = TILE;
+                const ctx = canvas.getContext('2d');
+                
+                ctx.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+                ctx.fillRect(4, 4, TILE - 8, TILE - 8);
+                
+                if (type === 'raw_beef') {
+                    ctx.fillStyle = 'rgb(100, 50, 50)';
+                    ctx.fillRect(12, 12, 8, 8);
+                    ctx.fillStyle = 'rgb(140, 70, 70)';
+                    ctx.fillRect(8, 8, 4, 4);
+                } else if (type === 'raw_mutton') {
+                    ctx.fillStyle = 'rgb(150, 80, 60)';
+                    ctx.fillRect(8, 8, 6, 6);
+                    ctx.fillRect(16, 16, 6, 6);
+                    ctx.fillStyle = 'rgb(180, 100, 80)';
+                    ctx.fillRect(12, 12, 4, 4);
+                } else if (type === 'raw_chicken') {
+                    ctx.fillStyle = 'rgb(200, 160, 120)';
+                    ctx.fillRect(10, 6, 12, 20);
+                    ctx.fillStyle = 'rgb(220, 180, 140)';
+                    ctx.fillRect(14, 10, 4, 8);
+                } else if (type === 'feather') {
+                    ctx.fillStyle = 'rgb(220, 220, 220)';
+                    ctx.fillRect(14, 4, 4, 24);
+                    for (let i = 0; i < 3; i++) {
+                        ctx.fillStyle = 'rgb(240, 240, 240)';
+                        ctx.fillRect(6 + i * 6, 8 + i * 4, 6, 2);
+                    }
+                }
                 
                 return canvas;
             }
@@ -1638,6 +1823,11 @@
                 'iron': createItemTexture(IRON_GRAY),
                 'gold': createItemTexture(GOLD_YELLOW),
                 'diamond': createItemTexture(DIAMOND_CYAN, 'circle'),
+                
+                'raw_beef': createFoodTexture(RAW_BEEF, 'raw_beef'),
+                'raw_mutton': createFoodTexture(RAW_MUTTON, 'raw_mutton'),
+                'raw_chicken': createFoodTexture(RAW_CHICKEN, 'raw_chicken'),
+                'feather': createFoodTexture(FEATHER, 'feather'),
                 
                 'stone_pickaxe': createPickaxeTexture('stone'),
                 'iron_pickaxe': createPickaxeTexture('iron'),
@@ -1841,12 +2031,22 @@
                     
                     if (distance <= 4 * TILE) {
                         if (mob.takeDamage(0.5)) {
+                            // Drop items on death
+                            const drops_list = mob.getDrops();
+                            for (const drop of drops_list) {
+                                for (let j = 0; j < drop.count; j++) {
+                                    drops.push({
+                                        x: mob.x + (Math.random() - 0.5) * TILE,
+                                        y: mob.y - TILE/2,
+                                        type: drop.type,
+                                        vy: -3
+                                    });
+                                }
+                            }
                             mobs.splice(i, 1);
                         } else {
                             mob.knockback(player.x, player.y);
-                            if (mob.type === 'sheep') {
-                                mob.state = 'fleeing';
-                            }
+                            mob.fleeTimer = 3000; // Flee for 3 seconds when hit
                         }
                         attackCooldown = 500;
                         return;
@@ -2046,15 +2246,22 @@
         }
         
         function drawPlayer() {
+            const screenX = player.x - camera.x;
+            const screenY = player.y - camera.y;
+            
+            if (screenX < -TILE || screenX > WIDTH + TILE || screenY < -TILE || screenY > HEIGHT + TILE) {
+                return;
+            }
+            
             ctx.fillStyle = 'rgb(240, 200, 170)';
-            ctx.fillRect(player.x - camera.x + 6, player.y - camera.y, 16, 14);
+            ctx.fillRect(screenX + 6, screenY, 16, 14);
             
             ctx.fillStyle = 'rgb(30, 144, 255)';
-            ctx.fillRect(player.x - camera.x + 4, player.y - camera.y + 14, 20, 14);
+            ctx.fillRect(screenX + 4, screenY + 14, 20, 14);
             
             ctx.fillStyle = 'rgb(20, 20, 120)';
-            ctx.fillRect(player.x - camera.x + 6, player.y - camera.y + 28, 6, 14);
-            ctx.fillRect(player.x - camera.x + 16, player.y - camera.y + 28, 6, 14);
+            ctx.fillRect(screenX + 6, screenY + 28, 6, 14);
+            ctx.fillRect(screenX + 16, screenY + 28, 6, 14);
         }
         
         // ================= TERRAIN GENERATION =================
@@ -2298,7 +2505,9 @@
                 const screenX = drop.x - camera.x - 8;
                 const screenY = drop.y - camera.y - 8;
                 
-                ctx.drawImage(blockTextures[drop.type], screenX, screenY, 16, 16);
+                if (screenX > -TILE && screenX < WIDTH && screenY > -TILE && screenY < HEIGHT) {
+                    ctx.drawImage(blockTextures[drop.type], screenX, screenY, 16, 16);
+                }
             }
         }
         
@@ -2389,6 +2598,32 @@
                     handleInventoryClick(i);
                 });
                 inventoryEl.appendChild(slot);
+            }
+        }
+        
+        function updateHealthUI() {
+            const healthBar = document.getElementById('healthBar');
+            healthBar.innerHTML = '';
+            
+            const fullHearts = Math.floor(health);
+            const hasPartial = health % 1 > 0;
+            
+            for (let i = 0; i < 10; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'heart';
+                
+                if (i < fullHearts) {
+                    heart.style.backgroundColor = 'red';
+                    heart.style.width = '30px';
+                } else if (i === fullHearts && hasPartial) {
+                    heart.style.backgroundColor = 'red';
+                    heart.style.width = '15px';
+                } else {
+                    heart.style.backgroundColor = 'gray';
+                    heart.style.width = '30px';
+                }
+                
+                healthBar.appendChild(heart);
             }
         }
         
@@ -2569,33 +2804,6 @@
             }
         }
         
-        // ================= HEALTH UI =================
-        function updateHealthUI() {
-            const healthBar = document.getElementById('healthBar');
-            healthBar.innerHTML = '';
-            
-            const fullHearts = Math.floor(health);
-            const hasPartial = health % 1 > 0;
-            
-            for (let i = 0; i < 10; i++) {
-                const heart = document.createElement('div');
-                heart.className = 'heart';
-                
-                if (i < fullHearts) {
-                    heart.style.backgroundColor = 'red';
-                    heart.style.width = '30px';
-                } else if (i === fullHearts && hasPartial) {
-                    heart.style.backgroundColor = 'red';
-                    heart.style.width = '15px';
-                } else {
-                    heart.style.backgroundColor = 'gray';
-                    heart.style.width = '30px';
-                }
-                
-                healthBar.appendChild(heart);
-            }
-        }
-        
         // ================= SKY =================
         function drawSky() {
             const skyColor = getSkyColor();
@@ -2689,15 +2897,19 @@
             gameTime += deltaTime / 1000;
             updateTimeDisplay();
             
+            // Spawn mobs every second
+            spawnTimer += deltaTime;
+            if (spawnTimer >= SPAWN_INTERVAL) {
+                spawnTimer = 0;
+                spawnMobs();
+            }
+            
             const playerTileX = Math.floor(player.x / TILE);
             for (let x = playerTileX - 15; x < playerTileX + 15; x++) {
                 if (heights[x] === undefined) {
                     generateTerrainAt(x);
                 }
             }
-            
-            // Spawn mobs
-            spawnMobs();
             
             // Update mobs
             for (let i = mobs.length - 1; i >= 0; i--) {
